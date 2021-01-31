@@ -13,11 +13,11 @@
 - Typically databases, queues, caches etc. are thought of as very different categories of tools. But in reality, they are superficially similar. Example ⇒ a database and message queue share the same purpose - "*to store data"*
 - These tools no longer neatly fit into their traditional categories. Some datastores are used as message queues like Redis. Some message queues posess database-like durability like Apache Kafka.
 - A single tool is no longer meant to satisfy all the growing demands of applications. Instead, the application is broken down into tasks where each task can be performed efficiently on a single tool, and those tools are tied together using application code. **Example ⇒ If the application has a caching layer (managed by an application using Memcached) or a full-text search server ~ indexes (like Elasticsearch) separate from the main database**; it's the responsibility of the application code to keep caches and indexes in sync with the main database.
-- API hiding underlying implementations -
+- API hiding underlying implementations -  
     ![API underlying implementation](../../assets/C101.png)
 
 - By glueing multiple tools together and then hiding theirr internal implementations from clients helps in creating ***special-purpose data system from smaller general-purpose components***.
-- While desiging data sy8stems multiple questions are unanswered.
+- While desiging data systems multiple questions are unanswered.
     - How to ensure data remains consistent in case of failure?
     - How to provide consistently good performance to clients even when some parts of system are degraded?
     - How to scale to handle increase in load?
@@ -25,8 +25,9 @@
 
 ### 3 concerns in software systems
 
-***Relability: System should continue to work correctly even in face of adversity***
+#### 1. Relability: 
 
+- **System should continue to work correctly even in face of adversity**
 - Reliability can be broadly defined as *'The Application performs functions that user expected'* **OR**  *'It can tolerate user's mistakes'* **OR** '*Its performance is good enough for the use-case under expected load and volume*' **OR** *'System prevents unauthorized access'*
 - Long story short ⇒ **'Systems continue to work correctly even when things go wrong'**
 - **Things that go wrong are called 'faults' and systems that cope-up with them are called 'fault-tolerant' systems.**
@@ -37,10 +38,12 @@
 - Hardware faults: HDD's - MTTF about 50-60 years. On a storage cluster with 10,000 disks, on an average one disk should die per day.
 - Software failures - **cascading failures** : one bug triggers issues in other apps. Service that the system depends on slows down, app crashing because of particular bad input.
 
-***Scalability: System should be capable of handling ways of dealing with growth in data volume, traffic volume or complexity***
+#### 2. Scalability: 
+
+- **System should be capable of handling ways of dealing with growth in data volume, traffic volume or complexity**
 
 - It is not necessary for a system to be reliable at every timestamp. In cases when there is sudden increase in the load on one component of application; there has to be proper mechanisms in place to handle the additional load.
-- Scalability - systems ability to cope with increased load.
+
 - **Understanding Load**
 
     The load can be described with the load params like `requests per second to a web server`, `number of reads in the database`, `number of simultaneous users actively` chatting in the chat room, etc. To elaborate on describing load, let's consider an example of Twitter.
@@ -55,14 +58,12 @@
     - Simply inserting tweet into global collection of tweets. When user requests their home timeline, lookup all the people they follow, find all tweets for each of those users and merge them.
 
         ![Twitter relational schema](../../assets/C102.png)
-
-        Relational schema for implementing twitter home timeline
+            Relational schema for implementing twitter home timeline
 
     - Maintain a cache for each user on a home timeline like a mailbox of tweets for each recipient user.  So each user posts a tweet. In the meantime, we look up all the people who follow that user. Next, from the mailbox, we insert each tweet into the mailbox of each recipient that follows the user. The request to read the home timeline is cheap because the results have been computed ahead of time.
 
         ![Twitter data pipeline](../../assets/C103.png)
-
-        Twitter's data pipeline for delivering tweets to followers with load parameters
+            Twitter's data pipeline for delivering tweets to followers with load parameters
 
     ⇒ Version 1 failed to keep up with the load of home timeline queries so company switched to approach 2. This works better because the average rate of published tweets is **two order of magnitude** less than the rate of home timeline reads and **so its preferable to do more work at write time** and less at read time. 
 
@@ -81,6 +82,7 @@
     - Tail latency amplification - Even if a small % of end-user requests require multiple backend calls, there is a high chance of getting a slow call if the end-user request requires multiple backend calls. Thus, a higher proportion of end-user requests end up being slow.
     - If you want to monitor response times for a service on a dashboard, you need to monitor it on an ongoing basis. A good idea is to keep a rolling window of response times of requests in the last 10 minutes. So there could be a graph of the median and various percentiles over that window.
     - *Averaging percentiles is useless, the right way of aggregating response time data is by adding histograms.*
+
 - **Approaches for coping with load**
     - *Scaling up* or *vertical scaling*: Moving to a more powerful machine
     - *Scaling out* or *horizontal scaling*: Distributing the load across multiple smaller machines.
@@ -88,8 +90,9 @@
 
     Distributing stateless services across multiple machines is fairly straightforward. Taking stateful data systems from a single node to a distributed setup can introduce a lot of complexity. Until recently it was common wisdom to keep your database on a single node.
 
-***Maintainability: People work on a system that undergoes several changes throughout its development cycle. The systems should be designed in a manner in which people will be able to adapt to the changes easily and work on them productively.***
+#### 3. Maintainability: 
 
+- **The systems should be designed in a manner in which people will be able to adapt to the changes easily and work on them productively.**
 - Majority of software requires ongoing maintainence. Every legacy system is unpleasant in its own way, and so its difficult to give general recommendations for dealing with them.
 - Design software in a manner that it will minimize pain during maintainence and thereby avoid creating legacy software ourselves.
 - Three design principles for software systems pertaining to maintainence -

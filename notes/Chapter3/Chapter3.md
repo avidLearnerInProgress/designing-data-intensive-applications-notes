@@ -101,7 +101,7 @@ queries, but every index slows down writes.***
     - Use same technique of key-value pairs sorted by key but with a completely different design philosophy - **Breaking the database down into fixed-size blocks or pages(typically 4KB in size) and read/write one page at a time. ~This design corresponds to disk as they too have fixed-size blocks.**
     - Each page can be identified using **an address or location** which allows one page to refer to another (very similar to pointer) but on disk instead of memory.
 
-        ![B Trees](../assets/C305.png)
+        ![B Trees](../../assets/C305.png)
 
         looking up a key using a b-tree index
 

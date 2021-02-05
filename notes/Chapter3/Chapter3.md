@@ -152,3 +152,34 @@ queries, but every index slows down writes.***
         - Similar to fuzzy search. [To query for keys that are not exact or within a range in sorted order]. Example - search for similar keys such as misspelled words.
         - Full-text search engines commonly allow a search for one word to be
         expanded to include synonyms of the word, to ignore grammatical variations of words, and to search for occurrences of words near each other in the same document, and support various other features that depend on linguistic analysis of the text.
+    - **Keeping everything into memory -**
+        - Disks have two significant advantages: they are **durable**, and they have **lower cost per gigabyte than RAM.** It's quite feasible to keep databases entirely in memory, this has lead to in-memory databases.
+        - In-memory key-value stores like Memcached are intended only for the purpose of caching. It's acceptable for data to be lost if machine is restarted.
+        - Other in-memory databases are also meant for durability which can be achieved using special hardware(battery-powered RAM) or by writing log of changes to disk or by writing periodic snapshots to disk.
+        - Products such as VoltDB, MemSQL, and Oracle TimesTen are in-memory databases with a relational model, and the vendors claim that they can offer big performance improvements by removing all the overheads associated with managing on-disk data structures.
+        - **Counterintuitively, the performance advantage of in-memory databases is not due to the fact that they don’t need to read from disk.** Even a disk-based storage engine may never need to read from disk if you have enough memory, because the operating system caches recently used disk blocks in memory anyway. **Rather, they can be faster because they can avoid the overheads of encoding in memory data structures in a form that can be written to disk.**
+        - Another interesting area is that in-memory databases may provide data models that are difficult to implement with disk-based indexes.
+
+### Transaction processing or analytics?
+
+- A transaction is a group of reads and writes that form a logical unit, this pattern became known as online transaction processing (OLTP).  
+- Data analytics has very different access patterns. A query would need to scan over a huge number of records, only reading a few columns per record, and calculates aggregate statistics.  
+- These queries are often written by business analysts, and fed into reports. This pattern became known for online analytics processing (OLAP).  
+
+### Data warehousing
+
+- A data warehouse is a separate database that analysts can query to their heart's content without affecting OLTP operations. It contains read-only copy of the dat in all various OLTP systems in the company. Data is extracted out of OLTP databases (through periodic data dump or a continuous stream of update), transformed into an analysis-friendly schema, cleaned up, and then loaded into the data warehouse (process Extract-Transform-Load or ETL).  
+
+- A data warehouse is most commonly relational, but the internals of the systems can look quite different.  
+
+- Amazon RedShift is hosted version of ParAccel. Apache Hive, Spark SQL, Cloudera Impala, Facebook Presto, Apache Tajo, and Apache Drill. Some of them are based on ideas from Google's Dremel.  
+
+- Data warehouses are used in fairly formulaic style known as a star schema.  
+
+- Facts are captured as individual events, because this allows maximum flexibility of analysis later. The fact table can become extremely large.  
+
+- Dimensions represent the who, what, where, when, how and why of the event.  
+
+- The name "star schema" comes from the fact than when the table relationships are visualised, the fact table is in the middle, surrounded by its dimension tables, like the rays of a star.  
+
+- Fact tables often have over 100 columns, sometimes several hundred. Dimension tables can also be very wide.   

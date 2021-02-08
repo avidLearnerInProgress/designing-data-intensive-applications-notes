@@ -160,26 +160,38 @@ queries, but every index slows down writes.***
         - **Counterintuitively, the performance advantage of in-memory databases is not due to the fact that they don’t need to read from disk.** Even a disk-based storage engine may never need to read from disk if you have enough memory, because the operating system caches recently used disk blocks in memory anyway. **Rather, they can be faster because they can avoid the overheads of encoding in memory data structures in a form that can be written to disk.**
         - Another interesting area is that in-memory databases may provide data models that are difficult to implement with disk-based indexes.
 
-### Transaction processing or analytics?
+### Transaction Processing or Analytics
 
-- A transaction is a group of reads and writes that form a logical unit, this pattern became known as online transaction processing (OLTP).  
-- Data analytics has very different access patterns. A query would need to scan over a huge number of records, only reading a few columns per record, and calculates aggregate statistics.  
-- These queries are often written by business analysts, and fed into reports. This pattern became known for online analytics processing (OLAP).  
+- Transaction processing just means **allowing clients to make low-latency reads and writes**— as opposed to batch processing jobs, which only run periodically. Transactions need not be ACID compliant.
+- The basic access pattern for databases remains similar to processing business transactions. An application typically looks up a small number of records by some key, using an index. Records are inserted or updated based on the user’s input. As these applications are interactive, the access pattern is called (OLTP).
+- The access pattern for databases pertaining to data analysis is called (OLAP). The analytic queries require scanning over a large number of records and read only a few columns per record. It also performs aggregation operations rather than returning raw data to the user.
 
-### Data warehousing
+    ![OLAP vs OLTP](../../assets/C306.png)
 
-- A data warehouse is a separate database that analysts can query to their heart's content without affecting OLTP operations. It contains read-only copy of the dat in all various OLTP systems in the company. Data is extracted out of OLTP databases (through periodic data dump or a continuous stream of update), transformed into an analysis-friendly schema, cleaned up, and then loaded into the data warehouse (process Extract-Transform-Load or ETL).  
+- **Data warehousing -**
+    - OLTP systems (systems powering the customer-facing website, controlling POS, inventory tracking, route planning) are usually highly available and they require to process transactions with low latency. Database administrators don't allow analysts to run ad hoc queries on OLTP databases as they are more expensive. **For this purpose, we have a data warehouse. It is a separate database that analysts can query for content. It is mainly a read-only version of your OLTP database with some customizations made to look like an analysis-friendly schema. ETL is used in a data warehouse to get the data.**
+    - **Datawarehouse can be optimized for analytic access patterns**. The indexing algorithms mentioned above work well for OLTP but not for analytical queries.
+- **Schemas for analytics** -
+    - Many data warehouses are used in a fairly formulaic style - *star schema* (or dimensional modeling). The name "star schema" comes from the fact that when the table relationships are visualized, the fact tables(generally represents events that occur at a particular time.) are in the middle, surrounded by its dimension tables (these represent the who, what, where, when, how, and why); The connections to these tables are like the rays of a star. We also have the *snowflake schema,* where dimensions are further broken down into subdimensions.
+    - Fact tables are usually more than 100 columns wide in big organizations and pretty large as well.
+- **Column-Oriented Storage -**
+    - If the fact-tables has trillion of rows and petabytes of data, storing and querying them efficiently becomes a challenging problem. Generally fact-tables are more than 100 columns wide but we rarely query all columns at a time while doing the analytics.
+    - For row-oriented storage engines, we need to have indexes on columns that we are trying to query. But since the row-oriented storage engines store data  in line-by-line fashion; they need to load all the data in memory, filter out rows that don't satisfy conditions. This takes a long time and its not very efficient.
+    - The idea behind column-oriented storage is simple: **don’t store all the values from one row together, but store all the values from each column together instead.** *If each column is stored in a separate file, a query only needs to read and parse those columns that are used in that query*, which can save a lot of work.
+    - Besides only loading columns from the disk that are required for a query, we can further reduce demands on disk throughput by compressing data. (Using run-length encoding, bitmap encoding)
 
-- A data warehouse is most commonly relational, but the internals of the systems can look quite different.  
+        ![Storing data by column](../../assets/C307.png)
 
-- Amazon RedShift is hosted version of ParAccel. Apache Hive, Spark SQL, Cloudera Impala, Facebook Presto, Apache Tajo, and Apache Drill. Some of them are based on ideas from Google's Dremel.  
+        Storing relational data by column, rather than by row
 
-- Data warehouses are used in fairly formulaic style known as a star schema.  
+        ![Compressed bitmap-indexed storage](../../assets/C308.png)
 
-- Facts are captured as individual events, because this allows maximum flexibility of analysis later. The fact table can become extremely large.  
+        Compressed, bitmap-indexed storage of a single column
 
-- Dimensions represent the who, what, where, when, how and why of the event.  
-
-- The name "star schema" comes from the fact than when the table relationships are visualised, the fact table is in the middle, surrounded by its dimension tables, like the rays of a star.  
-
-- Fact tables often have over 100 columns, sometimes several hundred. Dimension tables can also be very wide.   
+    - Cassandra and HBase have a concept of column families, which they inherited from Bigtable [9]. However, it is very misleading to call them column-oriented: within each column family, they store
+    all columns from a row together, along with a row key, and they do not use column compression. Thus, the Bigtable model is still mostly row-oriented.
+    - Sort order for columns -  It doesn't really matter in which order the rows are stored in a column store. It's easiest to store them in the order of insertion, but we can choose to impose order. **It won't make sense to sort each column individually though because we'll lose track of which columns belong to the same row. Rather, we sort the entire row at a time, even though it is stored by column.** We can choose the *columns* by which the table should be sorted.
+    - **C-stores provide an extension to sorting on column stores.** Different queries benefit from different sort orders, so we can store same data sorted in different ways.
+    - **Writing to Column-Oriented Storage -**
+        - Writes are more difficult in column-oriented storage. To insert row in middle of sorted table, we will need to rewrite all column files.
+        - LSM trees are a good alternative to B-Trees in this case. All writes go to an in-memory store first, where they are added to a sorted structure and prepared for writing to disk. It doesn't matter whether the in-memory store is row-oriented or column-oriented.

@@ -102,3 +102,15 @@
         - In Avro, null is not acceptable. To use null, we need to use union type. Also, there are no required/optional fields alike previous encodings.
         - Changing field datatype is possible, provided the datatype conversion is possible. **Changing field name is possible but little difficult since reader's schema can contain aliases for field names.**
         - Changing field names is backward compatible but not forward compatible. Similarly its true for adding a branch to union type.
+    - What is writer's schema in perspective of Avro?
+    - Large files with lots of records. - Example of Hadoop where writer's schema can be mentioned at top of large file.
+    - Database with individually written records - All records of the database may not necessarily have the same schema. Include version number at beginning of every encoded record and keep a list of schema versions in the database.  A reader can fetch a record, extract the version number, and then fetch the writer’s schema for that version number from the database. Using the writer's schema, it can decode the rest of the record.
+    - Sending records over n/w connection - When two processes send records over a bidirectional network, they can negotiate the schema version at the time of connection setup and then use that schema for the lifetime of the connection.
+    - Dynamically generated schemes - Avro has an advantage over the others because it is friendlier to dynamically generated schemas. Also, it doesn't keep tag numbers along with the schema like Protocol Buffers and Thrift.
+    
+    - **Modes of data flow -**
+        - Data flow through databases -
+            - Here, writers encode data and readers decode it.  Backward compatability is necessary in this case.  Usually databases allow multiple reads but the writes have to be one at a time.
+            - *Forward compatibility* is required in databases: If different processes are accessing the database, and one of the processes is from a newer version of the application ( say during a rolling upgrade), the newer code might write a value to the database. Forward compatibility is the ability of the process running the *old* code to be able to read the data written by the new code.
+            - We also need *backward compatibility* so that code from a newer version of the app can read data written by an older version.
+            - Data outlives code and often times, there's a need to migrate data to a new schema. Avro has sophisticated schema evolution rules that can allow a database to appear as if was encoded with a single schema, even though the underlying storage may contain records encoded with previous schema versions.

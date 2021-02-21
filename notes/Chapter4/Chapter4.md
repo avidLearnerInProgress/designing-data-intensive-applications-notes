@@ -103,14 +103,41 @@
         - Changing field datatype is possible, provided the datatype conversion is possible. **Changing field name is possible but little difficult since reader's schema can contain aliases for field names.**
         - Changing field names is backward compatible but not forward compatible. Similarly its true for adding a branch to union type.
     - What is writer's schema in perspective of Avro?
-    - Large files with lots of records. - Example of Hadoop where writer's schema can be mentioned at top of large file.
-    - Database with individually written records - All records of the database may not necessarily have the same schema. Include version number at beginning of every encoded record and keep a list of schema versions in the database.  A reader can fetch a record, extract the version number, and then fetch the writer’s schema for that version number from the database. Using the writer's schema, it can decode the rest of the record.
-    - Sending records over n/w connection - When two processes send records over a bidirectional network, they can negotiate the schema version at the time of connection setup and then use that schema for the lifetime of the connection.
-    - Dynamically generated schemes - Avro has an advantage over the others because it is friendlier to dynamically generated schemas. Also, it doesn't keep tag numbers along with the schema like Protocol Buffers and Thrift.
-    
-    - **Modes of data flow -**
-        - Data flow through databases -
-            - Here, writers encode data and readers decode it.  Backward compatability is necessary in this case.  Usually databases allow multiple reads but the writes have to be one at a time.
-            - *Forward compatibility* is required in databases: If different processes are accessing the database, and one of the processes is from a newer version of the application ( say during a rolling upgrade), the newer code might write a value to the database. Forward compatibility is the ability of the process running the *old* code to be able to read the data written by the new code.
-            - We also need *backward compatibility* so that code from a newer version of the app can read data written by an older version.
-            - Data outlives code and often times, there's a need to migrate data to a new schema. Avro has sophisticated schema evolution rules that can allow a database to appear as if was encoded with a single schema, even though the underlying storage may contain records encoded with previous schema versions.
+        - Large files with lots of records. - Example of Hadoop where writer's schema can be mentioned at top of large file.
+        - Database with individually written records - All records of the database may not necessarily have the same schema. Include version number at beginning of every encoded record and keep a list of schema versions in the database.  A reader can fetch a record, extract the version number, and then fetch the writer’s schema for that version number from the database. Using the writer's schema, it can decode the rest of the record.
+        - Sending records over n/w connection - When two processes send records over a bidirectional network, they can negotiate the schema version at the time of connection setup and then use that schema for the lifetime of the connection.
+        - Dynamically generated schemes - Avro has an advantage over the others because it is friendlier to dynamically generated schemas. Also, it doesn't keep tag numbers along with the schema like Protocol Buffers and Thrift.
+- **Modes of data flow -**
+    - **Data flow through databases -**
+        - Here, writers encode data and readers decode it.  Backward compatibility is necessary in this case.  Usually, databases allow multiple reads but the writes have to be one at a time.
+        - *Forward compatibility* is required in databases: If different processes are accessing the database, and one of the processes is from a newer version of the application ( say during a rolling upgrade), the newer code might write a value to the database. Forward compatibility is the ability of the process running the *old* code to be able to read the data written by the new code.
+        - We also need *backward compatibility* so that code from a newer version of the app can read data written by an older version.
+        - Data outlives code and oftentimes, there's a need to migrate data to a new schema. Avro has sophisticated schema evolution rules that can allow a database to appear as if was encoded with a single schema, even though the underlying storage may contain records encoded with previous schema versions.
+    - **Data flow through services - REST and GRPC**
+        - Processes that need to communicate over a network are usually set up with client-server arrangements. The server exposes an API over the network and the client connects to servers to make requests to the API. The API exposed is called the service.
+        - The server typically exposes an API over the network for the client to make requests. This API is known as a *service.* A server can also be a client to another service. E.g. a web app server is usually a client to a database.
+        - **A difference between a web app service and a database service is that there's a usually tighter restriction on the former. Database services allow arbitrary queries using a query language.**
+        - *Service-oriented architecture (SOA)*: Decomposing a large application into smaller components by area of functionality. SOA's are rebranded these day as Microservices.
+        - **Web services -**
+            - **REST is not a protocol, but a design philosophy** that builds upon principles of HTTP. It emphasizes simple data formats, using URLs for identifying resources and using HTTP features for cache control, authentication, and content type negotiation.
+            - **SOAP is an XML-based protocol** for making network API requests. It aims to be independent of HTTP and avoids most of the HTTP features.  SOAP API is described using the XML-based language called the **WSDL(Web service description language)**
+            - Web services heavily rely on the RPC model that tries to make requests to remote work services that look alike functions/methods.
+            - The n/w request is very different from any local function in the following manner -
+                - A local function call is predictable(1/0) whereas, the n/w request is unpredictable.
+                - Local function either returns results or throws an exception whereas, a n/w request might or might not return anything.
+                - Local function calls have clear visibility on troubleshooting which is not the case with an n/w request.
+                - Local functions allow passing params as references easily whereas, in the n/w request, you have to encode it in a string of bytes and send it over the n/w.
+            - There are different RPC frameworks like **gRPC** which implements **protocol buffers**; **Finagle** uses **Thrift** and [**Rest.li](http://rest.li)** uses JSON over HTTP.
+            - Finagle and [Rest.li](http://rest.li) have support for **futures(promises) to encapsulate async actions** that might fail. **gRPC supports streams** where a call consists of multiple requests and responses over time.
+            - A few RPC frameworks also provide service discovery which allows clients to find at which IP address and port a particular service is available.
+    - **Message passing dataflow -**
+        - They are similar to RPC in a sense that client's request is delivered to another process with low latency. They are similar to databases in a sense that message is not sent directly(via a network connection), but via an intermediary called message broker(message queue).
+        - Message broker has several advantages over RPC call -
+            - Acts as a buffer if receipient is unavailable.
+            - Automatic redeliver of message to the process that has crashed thereby preventing message loss.
+            - Preserves privacy of sender and receiver on their respective ends. (The ip address displayed to either sender/receiver is only of the message broker).
+            - Allows one to many or many to many relationship in terms of messages between sender and receiver .
+            - Provides logical decoupling between sender and receiver.
+        - The communication is usually one-way as opposed to the dual-way communication over RPC. Also, sender sends data in async fashion.
+        - **Message broker's functionality - one process sends a message to a named queue or topic, and the broker ensures that the message is delivered to one or more consumers of or subscribers to that queue or topic. There can be many producers and many consumers on the same topic.**
+        - A topic is one way dataflow. Message brokers don't enforce a particular data model. The message is just a sequence of bytes.

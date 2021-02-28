@@ -8,4 +8,4 @@
 
 4. [Encoding and Evolution](./notes/Chapter4/Chapter4.md)
 
-5. [Replication](../notes/Chapter5/Chapter5.md)
+5. [Replication](./notes/Chapter5/Chapter5.md)

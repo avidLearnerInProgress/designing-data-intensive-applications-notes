@@ -115,16 +115,21 @@
 
         - To avoid such anomaly we need consistent prefix reads. This guarantees that if a sequence of writes happens in a certain order and any follower reading these writes will see them in the same order. When writes are in the same order, the reads always see a consistent prefix.
 
+
 ### **Multi-Leader Replication**
 
 - In a Leader-based Replication, the leader acts as a single point of failure when we are dealing with writes in the database. We can use a multi-leader approach where we allow more than one node to accept writes. In this setup, each leader simultaneously acts as a follower to other leaders.
 - Use-cases -
-    - Multi datacenter operation - Here, we can have multiple leaders in each datacenter. Within each datacenter we can have a leader-follower replication. Inter-between datacenters, each datacenter's leader replicates its changes to leaders in other datacenters.
+    - **Multi datacenter operation**
+        - Here, we can have multiple leaders in each datacenter. Within each datacenter, we can have a leader-follower replication. Inter-between datacenters, each datacenter's leader replicates its changes to leaders in other datacenters.
 
-        ![C506](../../assets/C506.png)
+            ![C506](../../assets/C506.png)
 
-    - Single-leader vs Multi-leader configuration comparison in Multi datacenter operation -
-        - Performance - For single leader, every write must go over internet to datacenter with leader. This adds significant latency to writes. In multi-leader, every write goes through every local datacenter and is replicated asynchronously with other datacenters. There is inter-datacenter network delay (which is hidden from users).
-        - Tolerance of datacenter outages - For a single leader, if the leader in the data center fails, the failover can promote another follower to become the leader. In multi-leader configuration, the system works independently of others and replicas catch up when failed datacenter comes back online.
-        - Tolerance of network problems - Single leader configurations are very sensitive to problems in the inter-data center links because writes are synchronous over this link. Multi-leader configuration with asynchronous replication can tolerate network problems better.
-    
+        - Single-leader vs Multi-leader configuration comparison in Multi datacenter operation -
+            - Performance - For a single leader, every write must go over the internet to the datacenter with the leader. This adds significant latency to writes. In multi-leader, every write goes through every local datacenter and is replicated asynchronously with other datacenters. There is an inter-data center network delay (which is hidden from users).
+            - Tolerance of datacenter outages - For a single leader, if the leader in the data center fails, the failover can promote another follower to become the leader. In multi-leader configuration, the system works independently of others and replicas catch up when failed datacenter comes back online.
+            - Tolerance of network problems - Single leader configurations are very sensitive to problems in the inter-data center links because writes are synchronous over this link. Multi-leader configuration with asynchronous replication can tolerate network problems better.
+    - Clients with offline operations - Includes applications like Calendar, Google Drive.
+        - In this case, every device has a local database that acts as the leader and there is an asynchronous multi-leader application process between replicas of your calendar on all the devices.
+        - From an architectural point of view, this setup is essentially the same as multi-leader replication between datacenters, taken to the extreme: each device is a “datacenter,” and the network connection between them is extremely unreliable.
+    - Realtime collaborative-editing.

@@ -145,6 +145,6 @@
         - *On write:* When the database detects a conflict in the log of replicated changes, it calls the conflict handler. The handler typically runs in a background process and must execute quickly. It has no user interaction.
         - *On Read:* Conflicting writes are stored. However, when the data is read, the multiple versions of the data are returned to the user, either for the user to resolve them or for automatic resolution.
     - Automatic conflict resolution is a difficult problem, but there are some research ideas being used today:
-        - Conflict-free replicated datatypes (CRDTs) - Used in Riak 2.0
+        - Conflict-free replicated datatypes (CRDTs) - are a family of data structures for sets, maps, ordered lists, counters, etc. that can be concurrently edited by multiple users, and which automatically resolve conflicts in sensible ways. Used in Riak 2.0
         - Mergeable persistent data structure - Similar to Git. Tracks history explicitly
         - Operational transformation: Algorithm behind Google Docs.

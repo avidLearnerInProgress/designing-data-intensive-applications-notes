@@ -148,3 +148,8 @@
         - Conflict-free replicated datatypes (CRDTs) - are a family of data structures for sets, maps, ordered lists, counters, etc. that can be concurrently edited by multiple users, and which automatically resolve conflicts in sensible ways. Used in Riak 2.0
         - Mergeable persistent data structure - Similar to Git. Tracks history explicitly
         - Operational transformation: Algorithm behind Google Docs.
+- **Multi leader replication topologies -**
+    - Replication topology describes the path through which the writes are propagated to other leaders.
+    - Circular topology used in MySQL forwards writes from one node to another in an incremental fashion. Star topology has a designated root that forwards writes to all other nodes. All-to-all just forwards every write from current leader to ever other leader.
+    - With Circular and Star, the writes have to pass through several nodes before it reaches all the replicas. To prevent infinite loops, each node is given a unique identifier. Another problem with Circular and Star is that if just one node fails; it can interrupt the flow of replication messages between other nodes.
+    - All-to-all topology is more fault tolerant than the circular and star topologies because in those topologies, one node failing can interrupt the flow of replication messages across other nodes, making them unable to communicate until the node is fixed.

@@ -153,3 +153,39 @@
     - Circular topology used in MySQL forwards writes from one node to another in an incremental fashion. Star topology has a designated root that forwards writes to all other nodes. All-to-all just forwards every write from current leader to ever other leader.
     - With Circular and Star, the writes have to pass through several nodes before it reaches all the replicas. To prevent infinite loops, each node is given a unique identifier. Another problem with Circular and Star is that if just one node fails; it can interrupt the flow of replication messages between other nodes.
     - All-to-all topology is more fault tolerant than the circular and star topologies because in those topologies, one node failing can interrupt the flow of replication messages across other nodes, making them unable to communicate until the node is fixed.
+
+### **Leaderless Replication**
+
+- **Leaderless - Some data storage systems abandon the concept of leader and allow any replica to directly accept writes from clients.** The idea came again into existence when Amazon used it for its in-house DynamoDB database. Riak, Cassandra, and Voldemort use the same leaderless replication in their architecture.
+- Here, the client can send directly its writes to several replicas or there are co-ordinator nodes that are responsible for taking in the writes. The responsibilities with the co-ordinator node are less than the leader in the sense that it doesn't enforce a particular ordering of writes.
+- **Node Outage -**
+    - In leader-based replication, we can resolve to failover mechanism. However, in a leaderless configuration, the failover doesn't exist.
+
+        ![C507](../../assets/C507.png)
+
+    - User 1234 sends updates to all the three replicas in parallel fashion, and two available replicas accept the write but unavailable replica misses it. Lets assume (and for a reason exploring later) that if we have more than 50% of replicas acknowledging the write, we can assume that it is a legal write operation. Tn the above case, the client can simply ignore the fact that one of the replicas misses the write.
+    - Now when the unavailable node comes online and if there is a read request on the same node; we will witness a stale read in form of the response. To solve this problem, the client just doesn't send a read request to one of the replicas **but to all of the replicas/several nodes in parallel**. The client will receive multiple responses with either the most up-to-date data or stale data. On the client end, we can solve the issue of choosing which read to pick forward with the help of **version numbers**.
+- **Read repair and anti-entropy -**
+    - How to make unavailable nodes in-sync to the new writes?
+        - **Read-repair:** Reading several nodes in parallel for writes and then picking up the latest write based on versioning.
+        - **Anti-entropy:** Run a background service that constantly looks for difference in data between replicas and copies any missing data from one replica to another.
+- **Quorums for reading and writes -**
+    - Continuing from the node outage example - If 2/3 nodes are up and 1 is not available this means at most we have one replica that is stale. Among the two that are up and running, at least one will serve up-to-date data.
+    - **Quorum - For n replicas, every write must be confirmed by w nodes to be considered successful and we must query at least r nodes for each read. As long as w + r > n, we expect to get an up-to-date value when reading. Reads and writes that obey these r and w values are called quorum reads and writes. r and w are the minimum number of votes required for the read/write to be valid.**
+    - n, r and w are typically configurable. A common choice is to make n - odd and to set w = r = n + 1 / 2
+    - **The quorum condition allows the system to tolerate unavailable nodes.**
+        - If w < n, we can process writes if node is unavailable.
+        - If r < n, we can prcoess reads if node is unavailable.
+        - With n = 3, r = w = 2, we can tolerate one unavailable node.
+        - With n = 5, r = w = 3, we can tolerate two unavailable nodes.
+        - Reads and writes are always sent to all n replicas in parallel. The parameters w and r determine how many nodes we wait for—i.e., how many of the n nodes need to report success before we consider the read or write to be successful.
+    - Limitations -
+        - If you have n replicas, and you choose w and r such that w + r > n, you can generally expect every read to return the most recent value written for a key. This means that among the nodes we read, there must be at least one node that must return the latest value. Often r and w are chosen more than n/2 nodes, it ensures w + r > n and also tolerates up to n/2 node failures.
+        - With a smaller w and r, you are more likely to read stale values, because it’s more likely that your read didn’t include the node with the latest value. However, this guarantees low latency and high availability.
+        - When w + r > n , there are edge cases in which you will receive stale values -
+            - Sloppy quorum is used - The writes end up on nodes different that the r reads. Thus, there is no guarantee between an overlap between r and w nodes.
+            - When two writes occur concurrently, merging the write conflicts is the best and safe solution.
+            - When a write and read occur concurrently; the write may be reflected on only some of the replicas. Here we are unsure if the read returns old/new value.
+            - If a write succeeded on some replicas but failed on others (for example because the disks on some nodes are full), and overall succeeded on fewer than w replicas, it is not rolled back on the replicas where it succeeded.
+            - If a node carrying a new value fails, and its data is restored from a replica carrying an old value, the number of replicas storing the new value may fall below w,
+            breaking the quorum condition.

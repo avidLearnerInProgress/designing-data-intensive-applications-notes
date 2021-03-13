@@ -189,3 +189,20 @@
             - If a write succeeded on some replicas but failed on others (for example because the disks on some nodes are full), and overall succeeded on fewer than w replicas, it is not rolled back on the replicas where it succeeded.
             - If a node carrying a new value fails, and its data is restored from a replica carrying an old value, the number of replicas storing the new value may fall below w,
             breaking the quorum condition.
+- **Monitoring Staleness -**
+    - It's important to monitor whether databases are returning up-to-date results, even if the application can tolerate stale reads. If a replica falls behind significantly, the database should alert you so that you can investigate the cause.
+    - For leader-based replication, databases expose metrics for the replication lag. It's possible to do this because writes are applied to the leader and followers in the same order. We can determine how far behind a follower has fallen from a leader by subtracting its position from the leader's current position.
+    - This is more difficult in leaderless replication systems as there is no fixed order in which writes are applied. There's some research into this, but it's not common practice yet.
+- **Sloppy Quorum and Hinted-handoffs -**
+    - Databases that have configured the quorums correctly can tolerate the failure of individual nodes without the need for failover. **They can also tolerate individual nodes going slow because requests don't have to wait for all the n nodes to respond. They can respond when w or r nodes have responded.** This configuration makes databases with leaderless replication suitable for use cases that need high availability, low latency, and that can tolerate stale reads occasionally.
+    - However, quorums, as described above, are not as fault-tolerant as they can be. A simple network interruption can cut off all the nodes of the database from the client. In such a case, it is likely that fewer than w or r reachable nodes remain; thus it is not possible to achieve a quorum.
+    - In a cluster with more than n nodes, the client can connect to some of the database nodes during a network interruption(not the nodes that need to assemble a quorum for a particular value). In this case, the database designers face a trade-off -
+        - Is it better to return errors to all requests for which we cannot reach a quorum of
+        w or r nodes?
+        - Or should we accept writes anyway, and write them to some nodes that are
+        reachable but aren’t among the n nodes on which the value usually lives?  **⇒ Sloppy Quorum ⇒** Writes and reads still need w and r successful responses, but they might not include nodes that aren't among the designated n "home" nodes)
+    - By analogy, if you lock yourself out of your house, you may knock on the neighbor’s door and ask whether you may stay on their couch temporarily.
+    - Once the network interruption is fixed, and writes that one node temporarily
+    accepted on behalf of another node are sent to the appropriate “home” nodes. **⇒ Hinted Handoffs**
+    - Sloppy quorums ⇒ increase write availability. As long as w nodes are available, the database accepts writes. Even when w + r > n, we can't be sure to read the latest value for key because the latest value may have been temporarily written to some nodes outside of n
+    - **Thus, sloppy quorum ≠ quorum. It is only an assurance of durability.**

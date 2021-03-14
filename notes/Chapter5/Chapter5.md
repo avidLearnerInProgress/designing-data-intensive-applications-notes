@@ -206,3 +206,61 @@
     accepted on behalf of another node are sent to the appropriate “home” nodes. **⇒ Hinted Handoffs**
     - Sloppy quorums ⇒ increase write availability. As long as w nodes are available, the database accepts writes. Even when w + r > n, we can't be sure to read the latest value for key because the latest value may have been temporarily written to some nodes outside of n
     - **Thus, sloppy quorum ≠ quorum. It is only an assurance of durability.**
+- **Use case - Multi-datacenter operation:**
+    - Leaderless replication is also suitable for multi-datacenter operation, since it is designed to **tolerate conflicting concurrent writes, network interruptions, and latency spikes.**
+    - The number of replicas n can be spread across different datacenters. Each write from client can be sent to all replicas, regardless of datacenter, but the client usually only waits for **acknowledgment from a quorum of nodes** within its local datacenter so that it is unaffected by delays and interruptions on the cross-datacenter link.
+    - The higher-latency writes to other datacenters are often configured to happen asynchronously, although there is some flexibility in the configuration.
+- **Detecting write conflicts:**
+    - Dynamo-style databases allow several clients to concurrently write to same key ⇒ conflicts will occuer even when strict quorum is used. Although, the conflicts can arise even during read repair or hinted handoff.
+    - The problem in concurrent writes for dynamo-style database is that the events may arrive in a different order at different nodes because of network delays and partition failures.
+
+        ![C508](../../assets/C508.png)
+
+    - Here, two clients A and B write the value of X to A and B simultaneously. When we do a get call for X, by simply overwriting data, we make the nodes permanently incosistent.
+    - To make the nodes eventually consistent, the replicas must converge to one value and there are different algorithms to achieve this for example -
+        - **Last write wins -**
+            - **Each replica needs to store only the most "recent" or last value and allow "older" values to be overwritten and discarded.** Here, we have a way of unambiguously determining which write is the most recent and every write is eventually copied to every replica ⇒ replicas will eventually converge to the same value.
+            - The word "recent" is misleading. Its difficult to determine which write is the latest if it there are two clients sending the write requests. Even though the writes don’t have a natural ordering, we can force an arbitrary order on them(timestamp).  **Conflict resolution algorithm ⇒ Last Write Wins(LWW)**
+            - LWW achieves eventual convergence but at the cost of durability - If there are several concurrent write sto same key, even if they all are reported as successful to the client, only the latest write iwll survive and the rest all will be discarded.
+            - If data-loss is a concern, the LWW algorithm is a poor choice.
+            - The only safe way of using a database with LWW is to ensure that a key is only written once and thereafter treated as immutable, thus avoiding any concurrent updates to the same key(UUID's in Cassandra)
+    - **The "happens-before" relationship and concurrency -**
+        - Whenever we have two operations A and B, we have one of the three possibilities:
+            - **A happened before B**
+            - **B happened before A**
+            - **A and B are concurrent.**
+        - We say that an operation A happened before operation B if either of the following applies:
+            - **B knows about A**
+            - **B depends on A**
+            - **B builds upon A**
+        - **Thus, if we cannot capture this relationship between A and B, we say that they are concurrent. If they are concurrent, we have a conflict that needs to be resolved.**
+        - Exact time does not matter for defining concurrency, two operations are concurrent if they are both unaware of each other, regardless of the physical time which they occurred. Two operations can happen sometime apart and still be concurrent, as long as they are unaware of each other.
+    - **Capturing the "happens-before" relationship -**
+        - Assume that we have a single database with only one replica. Here, we have a scenario where there are two clients concurrently adding items to the same shopping cart -
+
+            ![C509](../../assets/C509.png)
+
+        - Initially the cart is empty. Cient 1 adds milk to the cart. Here the server successfully stores the value and labels it as version 1. The server also sends a response to the client with the value and its version number.
+        - Client 2 adds eggs concurrently to the cart(as that of Client 1) and labels version 2 to this write. Now client 1 is oblivious to the Client 2's write, and requests to add flour to the cart. So he assumes that the current cart values are [milk, flour]. The client 2 sends this value to server along with the version 1 that server gave to the client 1 previously. The server tells that the new value by Client 2 ⇒ [milk, flour] supersedes the prior value of [milk] but that is concurrent with [eggs]. Thus, server assigns version 3 to [milk, flour], overwrites version 1 value [milk] and keeps version 2 value [eggs] and reutnrs both the remaining values to the client.
+        - Client 2 tries to add ham to the cart unaware that client 1 just added flour. Client 2 receives 2 values [milk] and [eggs] from server in the last response and thus the value becomes [milk, eggs, ham]. Now when the server sees this value, it detects that version 2 overwrites [eggs] but it is concurrent with [milk, flour]. So we have [milk, flour] ⇒ version 3 and [milk, eggs, ham] ⇒ version 4
+        - Now, client 1 adds bacon. It previously received [milk, flour] and [eggs] from server at version 3 so it merges those adds bacon and send the final value as ⇒ [milk, flour, eggs, bacon] to sever with version number as 3.  This overwrites [milk, flour] (note that [eggs] was already overwritten in the last step) but is concurrent with [eggs, milk, ham], so the server keeps those two concurrent values.
+
+            ![C510](../../assets/C510.png)
+
+        - Note that the server can determine whether two operations are concurrent by looking
+        at the version numbers—it does not need to interpret the value itself (so the value
+        could be any data structure).
+        - It works like this:
+            - Each key is assigned a version number, and that version number is *incremented* every time that key is written, and the database stores the version number along with the value written. That version number is returned to a client.
+            - A client must read a key before writing. *When it reads a key, the server returns the latest version number together with the values that have not been overwritten.*
+            - When a client wants to write a new value, it returns the last version number it received in the prior step alongside the write.
+            - If the version number being passed with a write is higher than the version number of other values in the db, it means the new write is aware of those values at the time of the write (since it was returned from the prior read), and can overwrite all values with that version number or below.
+            - If there are higher version numbers, the database must keep all values with the higher version number (because those values are concurrent with the incoming write- it did not know about them).
+    - **Merging Concurrently Written Values -**
+        - With the algorithm described above, clients have to do the work of merging concurrently written values. Riak calls these values *siblings.*
+        - A simple merging approach is to take a union of the values. However, this can be faulty if one operation deleted a value but that value is still present in a sibling. To prevent this problem, the system must leave a marker *(tombstone)* to indicate that an item has been removed when merging siblings.
+        - CRDTs are data structures that can automatically merge siblings in sensible ways, including preserving deletions.
+    - **Version vectors:**
+        - We use version vectors per replica as well as per key. Each replica increments its own version number while processing a write and also keeps track of version number it has seen from each of the replicas. This information indicates which values to overwrite and which values to keep as siblings.
+        - **Collection of version numbers ⇒ version vectors.**
+        - Version vectors are sent from the database replicas to clients when values are read, and need to be sent back to the database when a value is subsequently written. Version vectors enable us to distinguish between overwrites and concurrent writes.

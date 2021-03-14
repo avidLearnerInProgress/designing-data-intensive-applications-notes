@@ -10,12 +10,12 @@
     
 2. [Data Models and Query Languages](./notes/Chapter2/Chapter2.md)
 
-    -[Relational Model Vs Document Model](./notes/Chapter2/Chapter2.md#Relational-Model-VS-Document-Model)
+    - [Relational Model Vs Document Model](./notes/Chapter2/Chapter2.md#Relational-Model-VS-Document-Model)
 
 3. [Storage and retrieval](./notes/Chapter3/Chapter3.md)
 
-    -[Data structures that power your database](./notes/Chapter3/Chapter3.md#Data-Structures-That-Power-Your-Database)
-    -[Transaction processing or Analytics](./notes/Chapter3/Chapter3.md#Transaction-Processing-or-Analytics)
+    - [Data structures that power your database](./notes/Chapter3/Chapter3.md#Data-Structures-That-Power-Your-Database)
+    - [Transaction processing or Analytics](./notes/Chapter3/Chapter3.md#Transaction-Processing-or-Analytics)
 
 4. [Encoding and Evolution](./notes/Chapter4/Chapter4.md)
 

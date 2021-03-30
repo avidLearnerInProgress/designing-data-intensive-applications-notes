@@ -66,3 +66,31 @@ not sufficient: we need to break the data up into partitions, also known as shar
     - This kind of indexing scheme is called a term-partitioned index because here the term we are looking for determines the partition of the index. Again, we can partition the index by the term itself or by the hash of the term. Partitioning by the term is useful for range scans and partitioning by the hash of term is useful for even distribution of load.
     - **Advantage: This technique makes reads more efficient as compared to the document-partitioned index.**
     - **Disadvantage: Here, the writes are slower and more complicated because a write to a single document may now affect multiple partitions of the index.**
+
+
+### **Rebalancing Partitions**
+
+- Process of moving load from one node to cluster ⇒ **rebalancing**
+- We need rebalancing when - Query throughput increases, Dataset size increases, Machine fails
+- Minimum requirements for rebalancing with any partitioning scheme:
+    - Load should be failry shared/distributed between nodes after rebalancing.
+    - During rebalancing, the database should continue accepting reads and writes(without any downtime)
+    - No more data than necessary should be moved between nodes to make rebalancing fast and minimize network and disk I/O load.
+- **How not to do rebalancing: Hash mod n**
+    - The problem with rebalancing with **mod n**  technique is the **integer n**. Whenever n changes, all the data has to be rebalanced/moved to its correct node depending on the new n.
+- **Fixed number of partitions -**
+    - Create many more partitions than nodes and assign several paritions to each node.
+    - When a node is added to the cluster, the new node can steal a few partitions from every existing node until partitions are fairly distributed again.
+
+        ![C605](../../assets/C605.png)
+
+    - In principle, you can even account for mismatched hardware in your cluster: by assigning more partitions to nodes that are more powerful, you can force those nodes to take a greater share of the load.
+    - Used in Riak, Elasticsearch, Couchbase, Voldemort.
+    - Choosing the right number of partitions is difficult if the total size of the dataset is
+    highly variable. If the dataset size keeps varying or growing; the partitions have to be rebalanced which is really expensive.
+- **Dynamic partitions -**
+    - For databases using key-range parititoning; fixed number of partitions with fixed boundaries is really inconvenient ⇒ If we get the boundaries wrong, we end up with all data in one partitions resulting in hotspots.
+    - Dynamic partitions used in HBase and RethinkDB. It is well-suited for key-based and hash-based partitioning schemes.
+    - Here, each partition is assigned to one node and each node can handle multiple partitions.(Similar to a fixed number of partitions)
+    - When the dataset size is varying, dynamic partitioning works really well as the number of partitions can be quickly adapted to total data volume.
+    - To mitigate the issue of starting with a single node, few databases like MongoDB and HBase allow pre-splitting.

@@ -94,3 +94,23 @@ not sufficient: we need to break the data up into partitions, also known as shar
     - Here, each partition is assigned to one node and each node can handle multiple partitions.(Similar to a fixed number of partitions)
     - When the dataset size is varying, dynamic partitioning works really well as the number of partitions can be quickly adapted to total data volume.
     - To mitigate the issue of starting with a single node, few databases like MongoDB and HBase allow pre-splitting.
+- **Partitioning proportionally to nodes -**
+    - For dynamic partitions ⇒ Number of partitions proportional to the size of dataset. ⇒ splitting and merging processes keep size of each partition between some fixed maxima and minima.
+    - For fixed partitions ⇒ Size of each partition proportional to the size of dataset.
+    - **In both the above cases, number of partitions is independent to number of nodes.**
+    - **Another option is to make number of partitons proportional to number of nodes. Here, each size of partition grows proportionally to dataset size while number of nodes remain unchanged. But when we increase the number of nodes, partitions become smaller again.** This is used by Cassandra and Ketama.
+    - When a new node joins the cluster ⇒ it randomly chooses a fixed number of existing partitions to split. Amongst the choosen partitions; the new node takes ownership of one half of split partitions while leaving other half in place.(This is the reason why partitions become smaller when we increase number of nodes) This randomization of partitions can produce unfair splits but when averaged over larger number of partitions, the new node takes a fair share of load from existing nodes.
+
+### Request routing
+
+- When a client wants to make request, how does it know which node it has to connect with? ⇒ As partitions are rebalanced, the assignment of partitions to nodes changes. There has to be a central service that determines the changes in partition to node mapping and someone who can answer the question "from which node ⇒ partition can I read a key `foo` and write a key `bar` to?"
+- **This is done by service discovery and it isn't just limited to databases. Any software accessible over a network has this problem(especially if we are aiming for high availability)**
+- On a high-level there are few different approaches to this problem -
+    - Allow clients to contact any node. If that particular node has the partition to which the request applies; it can handle the request itself and send the response to client'; else - forward the request to appropriate node.
+    - Send all requests from client to a routing tier first which determines which node has the appropriate partition from where the request can be handled. (Similar to load balancer)
+    - Require that clients be aware of partitioning and mapping between partitions and nodes.
+
+        ![C606](../../assets/C606.png)
+
+- In all the afore-mentioned cases, the key problem is how does the component make routing decisions. (keeping in mind changes in the assignment of partitions)
+- Zookeeper has become a de-facto standard coordination service to keep track of mapping between node and partition.

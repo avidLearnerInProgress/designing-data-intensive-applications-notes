@@ -26,7 +26,6 @@
 -   **The performance of db_get is terribly poor if we have a large number of records in the database.** Every time while performing a lookup, db_get has to scan the entire database file from beginning to end looking for occurrences of key. **The cost of lookup is O(n) where n is the size of records in the database.**
 -   **To efficiently find the value of a particular key in the database, we need a different data structure - index**. The general idea behind indexing is ⇒ to **keep some additional metadata which acts as a signpost and helps us locate the data we want.**
 -   Indexes are derived from primary data. Adding/removing indexes doesn't have impact on the actual data in database; it only affects the performance of database queries.
-
 -   **Maintaining additional structures(indexes) on the database incurs overhead, especially on writes.** Any index slows down the write because the index also needs to be updated every time data is written. **_Well-chosen indexes speed up read
     queries, but every index slows down writes._**
 
@@ -40,7 +39,8 @@
         indexing with in-memory hashmap with byte offset.
 
     -   This is a simplistic but viable approach. **Bitcask(default storage engine for Riak) uses this technique. They provide high-performance reads and writes(with a requirement that all keys fit in the RAM). The values can be loaded and unloaded from the disk with just one disk seek.** Also, if some amount of data from the disk is already in the cache; then we don't need any disk to seek operation at all.
-    -   A storage engine like bitmask is well-suited for scenarios **where the value for each key is updated frequently**. For example, the key might be the URL of a video and the value can be the number of views for that video.
+    -   A storage engine like `bitcask` is well-suited for scenarios **where the value for each key is updated frequently**. For example, the key might be the URL of a video and the value can be the number of views for that video.
+        - In such workloads, we have a lot of writes but there are not too many distinct keys and it's feasible to keep all keys in memory
     -   Appending to a single file might result in running out of disk space. A **good solution is to break log into segments of a certain size by closing the segment file when it reaches size and make subsequent write to a new segment file.** _Compaction_ (removing duplicate keys in the log) has to be performed on multiple segment files.
     -   Compaction makes segments smaller as the key is overwritten several times on average within one segment; we can merge several segments together at the same time as performing the compaction. Segments are never modified after they are written so the merged segment is written to a new file. Merging and compaction of frozen segments can be done in a background thread. While in the meanwhile, we can continue reading and writing requests as normal with older segment files. Once the merging is complete, we switch read requests to use the newly merged segments instead of old segments.
 

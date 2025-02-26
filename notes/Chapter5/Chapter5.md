@@ -163,13 +163,12 @@
 
 ### **Leaderless Replication**
 
-- **Leaderless - Some data storage systems abandon the concept of leader and allow any replica to directly accept writes from clients.** The idea came again into existence when Amazon used it for its in-house DynamoDB database. Riak, Cassandra, and Voldemort use the same leaderless replication in their architecture.
+- **Leaderless - Some data storage systems abandon the concept of leader and allow any replica to directly accept writes from clients.** 
+- Amazon uses it for its in-house Dynamo system(not similar to DynamoDB). Riak, Cassandra, and Voldemort use the same leaderless replication in their architecture.
 - Here, the client can send directly its writes to several replicas or there are co-ordinator nodes that are responsible for taking in the writes. The responsibilities with the co-ordinator node are less than the leader in the sense that it doesn't enforce a particular ordering of writes.
 - **Node Outage -**
     - In leader-based replication, we can resolve to failover mechanism. However, in a leaderless configuration, the failover doesn't exist.
-
         ![C507](../../assets/C507.png)
-
     - User 1234 sends updates to all the three replicas in parallel fashion, and two available replicas accept the write but unavailable replica misses it. Lets assume (and for a reason exploring later) that if we have more than 50% of replicas acknowledging the write, we can assume that it is a legal write operation. Tn the above case, the client can simply ignore the fact that one of the replicas misses the write.
     - Now when the unavailable node comes online and if there is a read request on the same node; we will witness a stale read in form of the response. To solve this problem, the client just doesn't send a read request to one of the replicas **but to all of the replicas/several nodes in parallel**. The client will receive multiple responses with either the most up-to-date data or stale data. On the client end, we can solve the issue of choosing which read to pick forward with the help of **version numbers**.
 - **Read repair and anti-entropy -**
@@ -188,20 +187,19 @@
         - Reads and writes are always sent to all n replicas in parallel. The parameters w and r determine how many nodes we wait for—i.e., how many of the n nodes need to report success before we consider the read or write to be successful.
     - Limitations -
         - If you have n replicas, and you choose w and r such that w + r > n, you can generally expect every read to return the most recent value written for a key. This means that among the nodes we read, there must be at least one node that must return the latest value. Often r and w are chosen more than n/2 nodes, it ensures w + r > n and also tolerates up to n/2 node failures.
-        - With a smaller w and r, you are more likely to read stale values, because it’s more likely that your read didn’t include the node with the latest value. However, this guarantees low latency and high availability.
-        - When w + r > n , there are edge cases in which you will receive stale values -
+        - If w + r <= n, reads and writes will still be sent to n nodes, but a smaller successful responses will be be required to deem an operation as successful. With a smaller w and r, you are more likely to read stale values, because it’s more likely that your read didn’t include the node with the latest value. However, this guarantees low latency and high availability.
+        - Even when w + r > n , there are edge cases in which you will receive stale values -
             - Sloppy quorum is used - The writes end up on nodes different that the r reads. Thus, there is no guarantee between an overlap between r and w nodes.
             - When two writes occur concurrently, merging the write conflicts is the best and safe solution.
             - When a write and read occur concurrently; the write may be reflected on only some of the replicas. Here we are unsure if the read returns old/new value.
             - If a write succeeded on some replicas but failed on others (for example because the disks on some nodes are full), and overall succeeded on fewer than w replicas, it is not rolled back on the replicas where it succeeded.
-            - If a node carrying a new value fails, and its data is restored from a replica carrying an old value, the number of replicas storing the new value may fall below w,
-            breaking the quorum condition.
+            - If a node carrying a new value fails, and its data is restored from a replica carrying an old value, the number of replicas storing the new value may fall below w, breaking the quorum condition.
 - **Monitoring Staleness -**
     - It's important to monitor whether databases are returning up-to-date results, even if the application can tolerate stale reads. If a replica falls behind significantly, the database should alert you so that you can investigate the cause.
     - For leader-based replication, databases expose metrics for the replication lag. It's possible to do this because writes are applied to the leader and followers in the same order. We can determine how far behind a follower has fallen from a leader by subtracting its position from the leader's current position.
     - This is more difficult in leaderless replication systems as there is no fixed order in which writes are applied. There's some research into this, but it's not common practice yet.
 - **Sloppy Quorum and Hinted-handoffs -**
-    - Databases that have configured the quorums correctly can tolerate the failure of individual nodes without the need for failover. **They can also tolerate individual nodes going slow because requests don't have to wait for all the n nodes to respond. They can respond when w or r nodes have responded.** This configuration makes databases with leaderless replication suitable for use cases that need high availability, low latency, and that can tolerate stale reads occasionally.
+    - Databases that have configured the quorums correctly can tolerate the failure of individual nodes without the need for failover. **They can also tolerate individual nodes going slow because requests don't have to wait for all the n nodes to respond. They can respond when w or r nodes have responded.** This configuration makes databases with leaderless replication suitable for use cases that need **high availability, low latency, and that can tolerate stale reads occasionally**.
     - However, quorums, as described above, are not as fault-tolerant as they can be. A simple network interruption can cut off all the nodes of the database from the client. In such a case, it is likely that fewer than w or r reachable nodes remain; thus it is not possible to achieve a quorum.
     - In a cluster with more than n nodes, the client can connect to some of the database nodes during a network interruption(not the nodes that need to assemble a quorum for a particular value). In this case, the database designers face a trade-off -
         - Is it better to return errors to all requests for which we cannot reach a quorum of

@@ -43,11 +43,8 @@
         - In such workloads, we have a lot of writes but there are not too many distinct keys and it's feasible to keep all keys in memory
     -   Appending to a single file might result in running out of disk space. A **good solution is to break log into segments of a certain size by closing the segment file when it reaches size and make subsequent write to a new segment file.** _Compaction_ (removing duplicate keys in the log) has to be performed on multiple segment files.
     -   Compaction makes segments smaller as the key is overwritten several times on average within one segment; we can merge several segments together at the same time as performing the compaction. Segments are never modified after they are written so the merged segment is written to a new file. Merging and compaction of frozen segments can be done in a background thread. While in the meanwhile, we can continue reading and writing requests as normal with older segment files. Once the merging is complete, we switch read requests to use the newly merged segments instead of old segments.
-
         ![Compaction of key-value update log](../../assets/C302.png)
-
         compaction of key value update log
-
         ![compaction and segment merging simultaneously.](../../assets/C303.png)
 
         compaction and segment merging simultaneously.
@@ -72,15 +69,11 @@
     -   In append only segment log, each log-structured storage segment is a sequence of key-value pairs. _They appear in order of writes(first key-value pair) and the values later in log take precedence over values for same key earlier in log(subsequent values for same key)_.
     -   **Sorted String Tables(SSTables) - Sequence of key-value pairs sorted by key. Also, each key only appears once within each merged segment file.**
     -   **Advantages of SSTables over log segments with hash indexes:**
-
         -   Merging segments is simple and efficient. Even if files are bigger than the available memory. How? - Read input files side by side, look at the first key in each file, copy the key according to sort order to the output file. Repeat this until all keys are copied to the output file(Similar to merge sort)
-
             ![merging SSTables and retaining only most recent value](../../assets/C304.png)
-
             merging SSTables and retaining only most recent value.
-
+    
         -   **No need to keep an index on all keys in memory.** For example, if you don't know the exact offset for the word 'handiwork' in the segment file. But you know the offsets for the keys 'handbag' and 'handsome' and since SSTables are sorted; you also know that 'handiwork' will lie between the two. This means that you can jump on the offset for 'handbag' and start scanning until you find 'handiwork'. 
-
             ![Sparse Indexing on SSTable](../../assets/C305.png)
 
         -   Sparse indexes are needed and not dense ones for SSTables.
@@ -100,16 +93,13 @@
         -   **Lucene**, an indexing engine for full-text search used by Elasticsearch and Solr, uses a similar method for storing its term dictionary. In Lucene, the mapping from term to postings list is kept in SSTable-like sorted files which are merged in the background as needed.
     -   **Performance optimizations**
         -   For the storage engine, using LSM-tree algorithm can be slow while performing lookup for keys that do not exist in database. To optimize this kind of access, storage engines often use additional **Bloom Filters.**
-        -   Different strategies to determine the order and timing of how SSTables are compacted and merged; most common being **size-tiered and leveled compaction.**
         -   In size-tiered compaction, newer and smaller SSTables are successively merged into older and larger SSTables. In leveled compaction, the key range is split up into smaller SSTables and older data is moved into separate “levels,” which allows the compaction to proceed more incrementally and use less disk space.
 
 -   **B Trees**
 
     -   Use same technique of key-value pairs sorted by key but with a completely different design philosophy - **Breaking the database down into fixed-size blocks or pages(typically 4KB in size) and read/write one page at a time. ~This design corresponds to disk as they too have fixed-size blocks.**
     -   Each page can be identified using **an address or location** which allows one page to refer to another (very similar to pointer) but on disk instead of memory.
-
         ![B Trees](../../assets/C305.png)
-
         looking up a key using a b-tree index
 
     -   In a B-tree you have a root page, from where you start your lookup. Next, we traverse the tree in a top-down manner until we reach a page containing individual keys(leaf page), which either contain value for each key inline or contain references to pages where values can be found.
@@ -154,7 +144,7 @@
         -   A compromise between a clustered index and a non-clustered index is called a **covering index**(index with included columns). This index stores some of a table's columns within the index and it allows some queries to be answered using the index alone.
     -   **Multi-column indexes -**
         -   To query multiple columns of the table, the mapping of a single key to a value(indexes so far) doesn't work. For this purpose, we need multi-column indexing and the most common of them is **concatenated index** ⇒ that **combines several fields into one key by appending one column into another** (the index definition specifies the order in which fields are concatenated)
-        -   **They are a general way of querying several columns at once which is really useful geospatial data.** For example, a restaurant search website has a database containing the latitude and longitude of each restaurant. When a user requests for all restaurants from a particular area on map, then, we need a two-dimensional query(<> latitude co-ords & <> longitude co-ords). Standard B-Tree or LSM index won't be able to get the latitude and longitude data simultaneously. [One option —> Translate 2D indexes into single number using space-filling curve and then to usee a regular B-Tree index]
+        -   **They are a general way of querying several columns at once which is really useful geospatial data.** For example, a restaurant search website has a database containing the latitude and longitude of each restaurant. When a user requests for all restaurants from a particular area on map, then, we need a two-dimensional query(latitude co-ordinates & longitude co-ordinates). Standard B-Tree or LSM index won't be able to get the latitude and longitude data simultaneously. [One option —> Translate 2D indexes into single number using space-filling curve and then to use a regular B-Tree index]
         -   For an eCommerce website, we can use a 3D index on the dimensions (RGB) to search for products in a certain range of colors. For a database of weather observations, we can have a 2D index(date, temperature) to search for all observations based on the 2D index.
     -   **Full-text search & fuzzy indexes -**
         -   Similar to fuzzy search. [To query for keys that are not exact or within a range in sorted order]. Example - search for similar keys such as misspelled words.
@@ -167,20 +157,18 @@
         -   Products such as VoltDB, MemSQL, and Oracle TimesTen are in-memory databases with a relational model, and the vendors claim that they can offer big performance improvements by removing all the overheads associated with managing on-disk data structures.
         -   **Counterintuitively, the performance advantage of in-memory databases is not due to the fact that they don’t need to read from disk.** Even a disk-based storage engine may never need to read from disk if you have enough memory, because the operating system caches recently used disk blocks in memory anyway. **Rather, they can be faster because they can avoid the overheads of encoding in memory data structures in a form that can be written to disk.**
         -   Another interesting area is that in-memory databases may provide data models that are difficult to implement with disk-based indexes.
-
 ### Transaction Processing or Analytics
 
 -   Transaction processing just means **allowing clients to make low-latency reads and writes**— as opposed to batch processing jobs, which only run periodically. Transactions need not be ACID compliant.
 -   The basic access pattern for databases remains similar to processing business transactions. An application typically looks up a small number of records by some key, using an index. Records are inserted or updated based on the user’s input. As these applications are interactive, the access pattern is called (OLTP).
 -   The access pattern for databases pertaining to data analysis is called (OLAP). The analytic queries require scanning over a large number of records and read only a few columns per record. It also performs aggregation operations rather than returning raw data to the user.
-
     ![OLAP vs OLTP](../../assets/C306.png)
 
 -   **Data warehousing -**
     -   OLTP systems (systems powering the customer-facing website, controlling POS, inventory tracking, route planning) are usually highly available and they require to process transactions with low latency. Database administrators don't allow analysts to run ad hoc queries on OLTP databases as they are more expensive. **For this purpose, we have a data warehouse. It is a separate database that analysts can query for content. It is mainly a read-only version of your OLTP database with some customizations made to look like an analysis-friendly schema. ETL is used in a data warehouse to get the data.**
-    -   **Datawarehouse can be optimized for analytic access patterns**. The indexing algorithms mentioned above work well for OLTP but not for analytical queries.
+    -   **Data-warehouse can be optimized for analytic access patterns**. The indexing algorithms mentioned above work well for OLTP but not for analytical queries.
 -   **Schemas for analytics** -
-    -   Many data warehouses are used in a fairly formulaic style - *star schema* (or dimensional modeling). The name "star schema" comes from the fact that when the table relationships are visualized, the fact tables(generally represents events that occur at a particular time.) are in the middle, surrounded by its dimension tables (these represent the who, what, where, when, how, and why); The connections to these tables are like the rays of a star. We also have the *snowflake schema,* where dimensions are further broken down into subdimensions.
+    -   Many data warehouses are used in a fairly formulaic style - *star schema* (or dimensional modelling). The name "star schema" comes from the fact that when the table relationships are visualized, the fact tables(generally represents events that occur at a particular time.) are in the middle, surrounded by its dimension tables (these represent the who, what, where, when, how, and why); The connections to these tables are like the rays of a star. We also have the *snowflake schema,* where dimensions are further broken down into sub-dimensions.
     -   Fact tables are usually more than 100 columns wide in big organizations and pretty large as well.
 -   **Column-Oriented Storage -**
     -   If the fact-tables has trillion of rows and petabytes of data, storing and querying them efficiently becomes a challenging problem. Generally fact-tables are more than 100 columns wide but we rarely query all columns at a time while doing the analytics.
@@ -189,11 +177,8 @@
     -   Besides only loading columns from the disk that are required for a query, we can further reduce demands on disk throughput by compressing data. (Using run-length encoding, bitmap encoding)
 
         ![Storing data by column](../../assets/C307.png)
-
         Storing relational data by column, rather than by row
-
         ![Compressed bitmap-indexed storage](../../assets/C308.png)
-
         Compressed, bitmap-indexed storage of a single column
 
     -   Cassandra and HBase have a concept of column families, which they inherited from Bigtable [9]. However, it is very misleading to call them column-oriented: within each column family, they store

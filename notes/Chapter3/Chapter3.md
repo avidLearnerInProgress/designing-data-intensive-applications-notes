@@ -4,7 +4,7 @@
 
 -   You’re probably not going to implement your own storage engine from scratch, but you do need to select a storage engine that is appropriate for your application, from the many that are available. In order to tune a storage engine
     to perform well on your kind of workload, you need to have a rough idea of what the storage engine is doing under the hood.
--   There is a big difference between storage engines that are optimized for transactional workloads and those that are optimised for analytics.
+-   There is a big difference between storage engines that are optimised for transactional workloads and those that are optimised for analytics.
 -   Two families of storage engines ⇒ log-structured & page-oriented
 
 ### Data Structures That Power Your Database
@@ -53,7 +53,7 @@
         compaction and segment merging simultaneously.
 
     -   Each segment has its own in-memory hash table that maps keys to file offsets. To find a value for the key, check the most recent segment's hash map; if key, not present - check subsequent segments and so on.
-    -   Following are few design considerations for a compaction, merge segment log in real world -
+    -   Following are few design considerations for a **compaction**, merge segment log in real world -
         -   **File format:** _CSV is not the best format for log. A binary format is faster and simpler as it first encodes length of string in bytes followed by raw string._
         -   **Deleting records:** _To delete key-value pair, append a special deletion record to a data file called a tombstone. When log segments are merged, the tombstone tells the merging process to discard any previous value for the deleted key._
         -   **Crash recovery:** _On a restart, in-memory hash maps are lost. So in practice, we can restore each segment's hashmap by reading the entire segment file from beginning to end and tracking offset for the most recent value for every key as we go along. This is a very time-consuming process if segment files are large. Another idea is to keep a snapshot of the segment's hashmap on disk,_
@@ -79,7 +79,7 @@
 
             merging SSTables and retaining only most recent value.
 
-        -   **No need to keep an index on all keys in memory.** For example, if you don't know the exact offset for the word 'handiwork' in the segment file. But you know the offsets for the keys 'handbag' and 'handsome' and since SSTables are sorted; you also know that 'handiwork' will lie between the two. This means that you can jump on the offset for 'handbag' and start scanning until you find 'handiwork'. \*\*\*\*
+        -   **No need to keep an index on all keys in memory.** For example, if you don't know the exact offset for the word 'handiwork' in the segment file. But you know the offsets for the keys 'handbag' and 'handsome' and since SSTables are sorted; you also know that 'handiwork' will lie between the two. This means that you can jump on the offset for 'handbag' and start scanning until you find 'handiwork'. 
 
             ![Sparse Indexing on SSTable](../../assets/C305.png)
 
@@ -183,7 +183,6 @@
     -   Many data warehouses are used in a fairly formulaic style - *star schema* (or dimensional modeling). The name "star schema" comes from the fact that when the table relationships are visualized, the fact tables(generally represents events that occur at a particular time.) are in the middle, surrounded by its dimension tables (these represent the who, what, where, when, how, and why); The connections to these tables are like the rays of a star. We also have the *snowflake schema,* where dimensions are further broken down into subdimensions.
     -   Fact tables are usually more than 100 columns wide in big organizations and pretty large as well.
 -   **Column-Oriented Storage -**
-
     -   If the fact-tables has trillion of rows and petabytes of data, storing and querying them efficiently becomes a challenging problem. Generally fact-tables are more than 100 columns wide but we rarely query all columns at a time while doing the analytics.
     -   For row-oriented storage engines, we need to have indexes on columns that we are trying to query. But since the row-oriented storage engines store data in line-by-line fashion; they need to load all the data in memory, filter out rows that don't satisfy conditions. This takes a long time and its not very efficient.
     -   The idea behind column-oriented storage is simple: **don’t store all the values from one row together, but store all the values from each column together instead.** _If each column is stored in a separate file, a query only needs to read and parse those columns that are used in that query_, which can save a lot of work.

@@ -7,7 +7,6 @@
     - Here we assume that the database is so small that each machine can hold it. If the data that you are replicating doesn't change over time, we just have to replicate/copy data to every node once.
     - When data is changing, it becomes difficult to implement replication. There are 3 popular algorithms for replication to be looked into - single leader, multi leader, and leaderless.
     - Many trade-offs need to be considered for replication - synchronous vs asynchronous replication; how to handle failed replicas, etc.
-
 ### Leaders and Followers
 
 - Each node stores a copy of the database called a replica. With multiple replicas, how to ensure that there is consistency between both the databases is a primary concern. Every write must be followed/processed by a replica.
@@ -15,9 +14,7 @@
     - One replica ⇒ leader.  Whenever clients want to write to the database, they send requests to the leader which first writes data to its local storage.
     - Other replicas ⇒ followers. The leader also sends the changed data to all of its followers other than writing it to its local storage. (This is called change stream/replication log) Each follower takes the log from the leader and updates its local copy of the database accordingly.
     - When the client wants to read the database it can either query the leader or any of its followers. Writes have to go through the leader.
-
         ![C501.png](../../assets/C501.png)
-
     - This mode of replication is a built-in feature for most relational databases like PostgreSQL, MySQL, SQL Server, etc. It is also used in MongoDB, RethinkDB, Espresso.
     - Leader Based replication is also employed in Distributed Message Brokers like Kafka and RabbitMQ.
 
@@ -120,7 +117,6 @@
     - **Multi datacenter operation**
         - Here, we can have multiple leaders in each datacenter. Within each datacenter, we can have a leader-follower replication. Inter-between datacenters, each datacenter's leader replicates its changes to leaders in other datacenters.
             ![C506](../../assets/C506.png)
-
         - Single-leader vs Multi-leader configuration comparison in Multi datacenter operation:
             - Performance
 	            - For a single leader, every write must go over the internet to the datacenter with the leader. This adds significant latency to writes.
@@ -160,7 +156,6 @@
     - Circular topology used in MySQL forwards writes from one node to another in an incremental fashion. Star topology has a designated root that forwards writes to all other nodes. All-to-all just forwards every write from current leader to ever other leader.
 	    - With Circular and Star, the writes have to pass through several nodes before it reaches all the replicas. To prevent infinite loops, each node is given a unique identifier. Another problem with Circular and Star is that if just one node fails; it can interrupt the flow of replication messages between other nodes.
     - All-to-all topology is more fault tolerant than the circular and star topologies because in those topologies, one node failing can interrupt the flow of replication messages across other nodes, making them unable to communicate until the node is fixed.
-
 ### **Leaderless Replication**
 
 - **Leaderless - Some data storage systems abandon the concept of leader and allow any replica to directly accept writes from clients.** 
@@ -202,26 +197,23 @@
     - Databases that have configured the quorums correctly can tolerate the failure of individual nodes without the need for failover. **They can also tolerate individual nodes going slow because requests don't have to wait for all the n nodes to respond. They can respond when w or r nodes have responded.** This configuration makes databases with leaderless replication suitable for use cases that need **high availability, low latency, and that can tolerate stale reads occasionally**.
     - However, quorums, as described above, are not as fault-tolerant as they can be. A simple network interruption can cut off all the nodes of the database from the client. In such a case, it is likely that fewer than w or r reachable nodes remain; thus it is not possible to achieve a quorum.
     - In a cluster with more than n nodes, the client can connect to some of the database nodes during a network interruption(not the nodes that need to assemble a quorum for a particular value). In this case, the database designers face a trade-off -
-        - Is it better to return errors to all requests for which we cannot reach a quorum of
-        w or r nodes?
+	    - Is it better to return errors to all requests for which we cannot reach a quorum of w or r nodes?
         - Or should we accept writes anyway, and write them to some nodes that are
-        reachable but aren’t among the n nodes on which the value usually lives?  **⇒ Sloppy Quorum ⇒** Writes and reads still need w and r successful responses, but they might not include nodes that aren't among the designated n "home" nodes)
-    - By analogy, if you lock yourself out of your house, you may knock on the neighbor’s door and ask whether you may stay on their couch temporarily.
-    - Once the network interruption is fixed, and writes that one node temporarily
-    accepted on behalf of another node are sent to the appropriate “home” nodes. **⇒ Hinted Handoffs**
-    - Sloppy quorums ⇒ increase write availability. As long as w nodes are available, the database accepts writes. Even when w + r > n, we can't be sure to read the latest value for key because the latest value may have been temporarily written to some nodes outside of n
-    - **Thus, sloppy quorum ≠ quorum. It is only an assurance of durability.**
+        reachable but aren’t among the n nodes on which the value usually lives?  
+        * ***Sloppy Quorum ⇒** Writes and reads still need w and r successful responses, but they might not include nodes that aren't among the designated n "home" nodes)
+	    - ***Hinted Handoffs*** ***⇒*** Once the network interruption is fixed, and writes that one node temporarily accepted on behalf of another node are sent to the appropriate “home” nodes. 
+	    - Sloppy quorums ⇒ increase write availability. As long as w nodes are available, the database accepts writes. Even when w + r > n, we can't be sure to read the latest value for key because the latest value may have been temporarily written to some nodes outside of n
+	    - **Thus, sloppy quorum ≠ quorum. It is only an assurance of durability.**
+	    - Riak has sloppy quorums enabled by default whereas Cassandra and Voldemort have it disabled by default
 - **Use case - Multi-datacenter operation:**
     - Leaderless replication is also suitable for multi-datacenter operation, since it is designed to **tolerate conflicting concurrent writes, network interruptions, and latency spikes.**
     - The number of replicas n can be spread across different datacenters. Each write from client can be sent to all replicas, regardless of datacenter, but the client usually only waits for **acknowledgment from a quorum of nodes** within its local datacenter so that it is unaffected by delays and interruptions on the cross-datacenter link.
     - The higher-latency writes to other datacenters are often configured to happen asynchronously, although there is some flexibility in the configuration.
 - **Detecting write conflicts:**
-    - Dynamo-style databases allow several clients to concurrently write to same key ⇒ conflicts will occuer even when strict quorum is used. Although, the conflicts can arise even during read repair or hinted handoff.
+    - Dynamo-style databases allow several clients to concurrently write to same key ⇒ conflicts will occur even when strict quorum is used. Although, the conflicts can arise even during read repair or hinted handoff.
     - The problem in concurrent writes for dynamo-style database is that the events may arrive in a different order at different nodes because of network delays and partition failures.
-
         ![C508](../../assets/C508.png)
-
-    - Here, two clients A and B write the value of X to A and B simultaneously. When we do a get call for X, by simply overwriting data, we make the nodes permanently incosistent.
+    - Here, two clients A and B write the value of X to A and B simultaneously. When we do a get call for X, by simply overwriting data, we make the nodes permanently inconsistent.
     - To make the nodes eventually consistent, the replicas must converge to one value and there are different algorithms to achieve this for example -
         - **Last write wins -**
             - **Each replica needs to store only the most "recent" or last value and allow "older" values to be overwritten and discarded.** Here, we have a way of unambiguously determining which write is the most recent and every write is eventually copied to every replica ⇒ replicas will eventually converge to the same value.
@@ -242,19 +234,13 @@
         - Exact time does not matter for defining concurrency, two operations are concurrent if they are both unaware of each other, regardless of the physical time which they occurred. Two operations can happen sometime apart and still be concurrent, as long as they are unaware of each other.
     - **Capturing the "happens-before" relationship -**
         - Assume that we have a single database with only one replica. Here, we have a scenario where there are two clients concurrently adding items to the same shopping cart -
-
             ![C509](../../assets/C509.png)
-
         - Initially the cart is empty. Cient 1 adds milk to the cart. Here the server successfully stores the value and labels it as version 1. The server also sends a response to the client with the value and its version number.
         - Client 2 adds eggs concurrently to the cart(as that of Client 1) and labels version 2 to this write. Now client 1 is oblivious to the Client 2's write, and requests to add flour to the cart. So he assumes that the current cart values are [milk, flour]. The client 2 sends this value to server along with the version 1 that server gave to the client 1 previously. The server tells that the new value by Client 2 ⇒ [milk, flour] supersedes the prior value of [milk] but that is concurrent with [eggs]. Thus, server assigns version 3 to [milk, flour], overwrites version 1 value [milk] and keeps version 2 value [eggs] and reutnrs both the remaining values to the client.
         - Client 2 tries to add ham to the cart unaware that client 1 just added flour. Client 2 receives 2 values [milk] and [eggs] from server in the last response and thus the value becomes [milk, eggs, ham]. Now when the server sees this value, it detects that version 2 overwrites [eggs] but it is concurrent with [milk, flour]. So we have [milk, flour] ⇒ version 3 and [milk, eggs, ham] ⇒ version 4
         - Now, client 1 adds bacon. It previously received [milk, flour] and [eggs] from server at version 3 so it merges those adds bacon and send the final value as ⇒ [milk, flour, eggs, bacon] to sever with version number as 3.  This overwrites [milk, flour] (note that [eggs] was already overwritten in the last step) but is concurrent with [eggs, milk, ham], so the server keeps those two concurrent values.
-
             ![C510](../../assets/C510.png)
-
-        - Note that the server can determine whether two operations are concurrent by looking
-        at the version numbers—it does not need to interpret the value itself (so the value
-        could be any data structure).
+        - Note that the server can determine whether two operations are concurrent by looking at the version numbers—it does not need to interpret the value itself (so the value could be any data structure).
         - It works like this:
             - Each key is assigned a version number, and that version number is *incremented* every time that key is written, and the database stores the version number along with the value written. That version number is returned to a client.
             - A client must read a key before writing. *When it reads a key, the server returns the latest version number together with the values that have not been overwritten.*
